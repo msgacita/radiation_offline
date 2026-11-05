@@ -1,0 +1,13 @@
+&offline_control
+  radiation_scheme     = 'ecrad'        ! 'rrtmg' ou 'ecrad'
+  path_pressure_level  = 'era5_pressure_level.nc'
+  path_single_level    = 'era5_single_level.nc'
+  ilon_start           = 1       ! 1-based indices into the
+  ilon_end             = 121       ! ERA5 file's own
+  ilat_start           = 1       ! longitude/latitude
+  ilat_end             = 61       ! coordinate arrays
+  itime_start          = 1
+  itime_end            = 2
+  path_output          = 'output.nc'
+  ecrad_namelist_path  = 'config.nam'   ! só lido se radiation_scheme='ecrad'
+/

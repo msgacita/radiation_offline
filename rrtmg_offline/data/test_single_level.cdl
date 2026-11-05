@@ -1,0 +1,31 @@
+netcdf test_single_level {
+dimensions:
+    longitude = 1 ;
+    latitude = 1 ;
+    valid_time = 2 ;
+variables:
+    double longitude(longitude) ;
+    double latitude(latitude) ;
+    double valid_time(valid_time) ;
+        valid_time:units = "hours since 1970-1-1 00:00:00" ;
+    float sp(valid_time, latitude, longitude) ;
+    float skt(valid_time, latitude, longitude) ;
+    float fal(valid_time, latitude, longitude) ;
+    float siconc(valid_time, latitude, longitude) ;
+    float sd(valid_time, latitude, longitude) ;
+    float lsm(valid_time, latitude, longitude) ;
+    float z(valid_time, latitude, longitude) ;
+
+data:
+    longitude = 305.0 ;
+    latitude = -22.75 ;
+    valid_time = 486840, 486841 ;
+
+    sp = 96500.0, 96480.0 ;
+    skt = 299.0, 298.7 ;
+    fal = 0.15, 0.15 ;
+    siconc = 0.0, 0.0 ;
+    sd = 0.0, 0.0 ;
+    lsm = 1.0, 1.0 ;
+    z = 750.0, 750.0 ;
+}

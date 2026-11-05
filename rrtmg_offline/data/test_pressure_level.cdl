@@ -1,0 +1,64 @@
+netcdf test_pressure_level {
+dimensions:
+    longitude = 1 ;
+    latitude = 1 ;
+    pressure_level = 5 ;
+    valid_time = 2 ;
+variables:
+    double longitude(longitude) ;
+        longitude:units = "degrees_east" ;
+    double latitude(latitude) ;
+        latitude:units = "degrees_north" ;
+    double pressure_level(pressure_level) ;
+        pressure_level:units = "hPa" ;
+    double valid_time(valid_time) ;
+        valid_time:units = "hours since 1970-1-1 00:00:00" ;
+    float t(valid_time, pressure_level, latitude, longitude) ;
+    float q(valid_time, pressure_level, latitude, longitude) ;
+    float z(valid_time, pressure_level, latitude, longitude) ;
+    float clwc(valid_time, pressure_level, latitude, longitude) ;
+    float ciwc(valid_time, pressure_level, latitude, longitude) ;
+    float crwc(valid_time, pressure_level, latitude, longitude) ;
+    float cswc(valid_time, pressure_level, latitude, longitude) ;
+    float cc(valid_time, pressure_level, latitude, longitude) ;
+    float o3(valid_time, pressure_level, latitude, longitude) ;
+
+data:
+    // IMPORTANT: pressure_level ascending (index 1 = TOA/lowest
+    // pressure, index N = near-surface/highest pressure) -- this is
+    // the real CDS convention. An earlier revision of this test file
+    // had this backwards (descending), which is physically
+    // inconsistent (z must decrease as p increases) and caused
+    // era5_ecrad_bridge's monotonicity check to fail.
+    longitude = 305.0 ;
+    latitude = -22.75 ;
+    pressure_level = 300, 500, 700, 850, 1000 ;
+    valid_time = 486840, 486841 ;
+
+    t = 240.0, 265.0, 283.0, 293.0, 298.0,
+        239.9, 264.8, 282.7, 292.6, 297.5 ;
+
+    q = 0.0003, 0.002, 0.006, 0.010, 0.014,
+        0.0003, 0.0019, 0.0059, 0.0099, 0.0138 ;
+
+    z = 90200.0, 55700.0, 30500.0, 14700.0, 800.0,
+        90210.0, 55710.0, 30510.0, 14710.0, 810.0 ;
+
+    clwc = 0.0, 0.00002, 0.0001, 0.00005, 0.00005,
+           0.0, 0.00002, 0.00009, 0.00004, 0.00004 ;
+
+    ciwc = 0.0, 0.00003, 0.00001, 0.0, 0.0,
+           0.0, 0.00003, 0.00001, 0.0, 0.0 ;
+
+    crwc = 0.0, 0.0, 0.0, 0.0, 0.0,
+           0.0, 0.0, 0.0, 0.0, 0.0 ;
+
+    cswc = 0.0, 0.0, 0.0, 0.0, 0.0,
+           0.0, 0.0, 0.0, 0.0, 0.0 ;
+
+    cc = 0.0, 0.05, 0.1, 0.5, 0.3,
+         0.0, 0.05, 0.1, 0.45, 0.25 ;
+
+    o3 = 2.5e-6, 0.15e-6, 0.05e-6, 0.03e-6, 0.02e-6,
+         2.5e-6, 0.15e-6, 0.05e-6, 0.03e-6, 0.02e-6 ;
+}
