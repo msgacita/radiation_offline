@@ -1,22 +1,7 @@
 ! radconst_offline.F90
 !
-! Faithful, unmodified-math port of subroutine radconst() from
-! MPAS-Model's src/core_atmosphere/physics/
-! mpas_atmphys_driver_radiation_sw.F (itself borrowed from WRF).
-! Computes the solar declination angle and the eccentricity-corrected
-! solar constant for a given day of year. Pure math, no MPAS
-! dependency at all in the original -- copied here verbatim (only
-! wrapped in a module and given its two module-level constants,
-! solcon_0/degrad/dpd, explicitly as arguments/parameters instead of
-! "use mpas_atmphys_constants").
-!
-! rrtmg_swrad() itself then computes the actual cosine of solar
-! zenith angle (coszrs) internally from declin + latitude + hour angle
-! (see module_ra_rrtmg_sw.F around "coszrs = sin(xxlat)*sin(declin) +
-! cos(xxlat)*cos(declin)*cos(hrang)") -- the offline driver does not
-! need to (and should not) duplicate that calculation; it only needs
-! to supply declin/solcon (from here) plus gmt/xtime/julday/xlat/xlong
-! so rrtmg_swrad can compute coszrs itself, exactly as MPAS does.
+! Computes solar declination, the equation-of-time-corrected cosine of
+! the solar zenith angle, and the eccentricity-corrected solar constant.
 module radconst_offline
 
   use mpas_kind_types, only : RKIND
@@ -26,41 +11,53 @@ module radconst_offline
   public :: radconst
 
   real(kind=RKIND), parameter :: degrad   = 3.1415926_RKIND/180.0_RKIND
-  real(kind=RKIND), parameter :: dpd      = 360.0_RKIND/365.0_RKIND
-  real(kind=RKIND), parameter :: solcon_0 = 1370.0_RKIND  ! W/m2, MPAS's own value
+  real(kind=RKIND), parameter :: solcon_0 = 1366.1_RKIND  ! W/m2, MPAS's own value
                                                            ! (mpas_atmphys_constants.F
                                                            ! has an alternative
                                                            ! 1365.0 commented out)
 
+!   real(kind=RKIND), parameter :: solcon_0 = 1370.0_RKIND  ! W/m2, MPAS's own value
+!                                                            ! (mpas_atmphys_constants.F
+!                                                            ! has an alternative
+!                                                            ! 1365.0 commented out)
 contains
 
-  subroutine radconst(declin, solcon, julian)
+  subroutine radconst(declin, solcon, coszrs, julian, xlat, xlong, gmt, xtime, radt)
 
     real(kind=RKIND), intent(in)  :: julian   ! day of year, 1.0-366.0 (fractional
                                                ! within the day is fine, e.g.
                                                ! 45.5 for noon on day 45)
+    real(kind=RKIND), intent(in)  :: xlat     ! latitude, degrees
+    real(kind=RKIND), intent(in)  :: xlong    ! longitude, degrees
+    real(kind=RKIND), intent(in)  :: gmt      ! GMT offset, hours
+    real(kind=RKIND), intent(in)  :: xtime    ! local time, minutes
+    real(kind=RKIND), intent(in)  :: radt     ! radiation time step, minutes
     real(kind=RKIND), intent(out) :: declin   ! solar declination, radians
     real(kind=RKIND), intent(out) :: solcon   ! solar constant, W/m2
+    real(kind=RKIND), intent(out) :: coszrs   ! cosine of solar zenith angle
 
-    real(kind=RKIND) :: obecl, sinob, sxlong, arg, djul, rjul, eccfac
+    real(kind=RKIND) :: djul, rjul, eccfac
+    real(kind=RKIND) :: hour, gamma, eot, angle
 
     declin = 0.0_RKIND
     solcon = 0.0_RKIND
+    coszrs = 0.0_RKIND
 
-    ! obliquity = 23.5 degrees
-    obecl = 23.5_RKIND*degrad
-    sinob = sin(obecl)
-
-    ! longitude of the sun from vernal equinox
-    if (julian >= 80.0_RKIND) then
-      sxlong = dpd*(julian-80.0_RKIND)
-    else
-      sxlong = dpd*(julian+285.0_RKIND)
-    end if
-    sxlong = sxlong*degrad
-    arg    = sinob*sin(sxlong)
-    declin = asin(arg)
-
+    ! julian already includes the UTC fraction of the day. xtime and
+    ! half the radiation step advance that instant to the RRTMG midpoint.
+    hour = gmt + (xtime+radt*0.5)/60.0
+    gamma = 2.0_RKIND*acos(-1.0_RKIND)/365.0_RKIND * &
+          &  (julian-1.0_RKIND+(xtime+radt*0.5)/1440.0_RKIND)
+    ! NOAA fractional-year solar declination and equation of time (minutes):
+    ! https://gml.noaa.gov/grad/solcalc/solareqns.PDF
+    declin = 0.006918_RKIND - 0.399912_RKIND*cos(gamma) + 0.070257_RKIND*sin(gamma) &
+          & - 0.006758_RKIND*cos(2.0_RKIND*gamma) + 0.000907_RKIND*sin(2.0_RKIND*gamma) &
+          & - 0.002697_RKIND*cos(3.0_RKIND*gamma) + 0.001480_RKIND*sin(3.0_RKIND*gamma)
+    eot = 229.18_RKIND * (0.000075_RKIND + 0.001868_RKIND*cos(gamma) - 0.032077_RKIND*sin(gamma) &
+          &  - 0.014615_RKIND*cos(2.0_RKIND*gamma) - 0.040849_RKIND*sin(2.0_RKIND*gamma))
+    angle = 15.0_RKIND*(hour+xlong/15.0_RKIND+eot/60.0_RKIND-12.0_RKIND)*degrad
+    coszrs = sin(xlat*degrad)*sin(declin) &
+          & + cos(xlat*degrad)*cos(declin)*cos(angle)
     ! solar constant eccentricity factor (Paltridge and Platt 1976)
     djul   = julian*360.0_RKIND/365.0_RKIND
     rjul   = djul*degrad

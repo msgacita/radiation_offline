@@ -96,6 +96,8 @@ program rad_offline_driver
   real(kind=RKIND) :: xlat(ims:ime,jms:jme), xlong(ims:ime,jms:jme)
   real(kind=RKIND), parameter :: p0 = 100000.0_RKIND
   real(kind=RKIND), parameter :: Rd_over_cp = 287.0_RKIND/1004.5_RKIND
+  real(kind=RKIND), parameter :: xtime = 0.0_RKIND
+  real(kind=RKIND), parameter :: radt = 60.0_RKIND
   real(kind=RKIND) :: z0,z1,z2,w1,w2,fzm,fzp
 
   ! =================================================================
@@ -158,7 +160,8 @@ program rad_offline_driver
             allocate(flux_lw_up(col%nlev_valid+1), flux_lw_dn(col%nlev_valid+1))
             allocate(flux_lw_up_clear(col%nlev_valid+1), flux_lw_dn_clear(col%nlev_valid+1))
             call era5_valid_time_to_julian_gmt(era5f, itime_probe, julian, gmt, julday)
-            call radconst(declin, solcon, julian)
+            call radconst(declin, solcon, coszr(1,1), julian, col%lat, col%lon, &
+                 &        gmt, xtime, radt)
             call era5_ecrad_run_column(ecrad_config, col, declin, solcon, gmt, &
                  &  3.1415926_RKIND/180.0_RKIND, rthratensw, rthratenlw, &
                  &  flux_sw_up, flux_sw_dn, flux_lw_up, flux_lw_dn, &
@@ -237,8 +240,9 @@ program rad_offline_driver
         end if
 
         call era5_valid_time_to_julian_gmt(era5f, itime, julian, gmt, julday)
-        call radconst(declin, solcon, julian)
         degrad_local = 3.1415926_RKIND/180.0_RKIND
+        call radconst(declin, solcon, coszr(1,1), julian, col%lat, col%lon, &
+             &        gmt, xtime, radt)
 
         allocate(rthratensw(nlev)  , rthratenlw(nlev))
 	rthratensw=0.0;rthratenlw=0.0
@@ -377,7 +381,6 @@ program rad_offline_driver
       snow(1,1)   = col%snow_kg_m2
       xlat(1,1)   = col%lat
       xlong(1,1)  = col%lon
-      coszr(1,1)  = 0.0_RKIND
       gsw = 0.0_RKIND; swcf = 0.0_RKIND
       rthratensw3 = 0.0_RKIND; rthratenlw3 = 0.0_RKIND
 
@@ -398,8 +401,8 @@ program rad_offline_driver
       call rrtmg_swrad(p3d=p3d,p8w=p8w,pi3d=pi3d,t3d=t3d,t8w=t8w,dz8w=dz8w,        &
            &  qv3d=qv3d,qc3d=qc3d,qr3d=qr3d,qi3d=qi3d,qs3d=qs3d,qg3d=qg3d,          &
            &  cldfra3d=cldfra3d,o33d=o33d,tsk=tsk,albedo=albedo,                   &
-           &  xland=xland,xice=xice,snow=snow,coszr=coszr,xtime=0.0_RKIND,gmt=gmt, &
-           &  julday=julday,radt=60.0_RKIND,degrad=degrad_local,declin=declin,      &
+           &  xland=xland,xice=xice,snow=snow,coszr=coszr,xtime=xtime,gmt=gmt,     &
+           &  julday=julday,radt=radt,degrad=degrad_local,declin=declin,            &
            &  solcon=solcon,xlat=xlat,xlong=xlong,icloud=1,                        &
            &  cldovrlp=2,idcor=1,o3input=0,                                        &
            &  noznlevels=1,gsw=gsw,swcf=swcf,rthratensw=rthratensw3,               &

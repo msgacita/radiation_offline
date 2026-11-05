@@ -307,7 +307,7 @@ end subroutine ecrad_swrad
     real(jprb),intent(inout), dimension(config%n_g_sw, istartcol:iendcol) :: sw_albedo_direct
     real(jprb),intent(inout), dimension(config%n_g_sw, istartcol:iendcol) :: sw_albedo_diffuse
 
-          write(*,'(a)') 'Computing shortwave fluxes'
+        !  write(*,'(a)') 'Computing shortwave fluxes'
 
 
       if (config%do_sw) then

@@ -240,18 +240,13 @@ program rrtmg_offline_driver
     snow(1,1)   = col%snow_kg_m2
     xlat(1,1)   = col%lat
     xlong(1,1)  = col%lon
-    coszr(1,1)  = 0.0_RKIND   ! recomputed internally by rrtmg_swrad
     gsw = 0.0_RKIND; swcf = 0.0_RKIND
 
     call era5_valid_time_to_julian_gmt(era5f, itime, julian, gmt, julday)
-    call radconst(declin, solcon, julian)
     degrad_local = 3.1415926_RKIND/180.0_RKIND
-    radt = 60.0_RKIND     ! minutes. IMPORTANT: rrtmg_swrad computes
-                         ! coszrs using xt24=mod(xtime+radt*0.5,1440),
-                         ! i.e. it centers the zenith angle on
-                         ! xtime+radt/2 (WRF/MPAS's forward-averaging
-                         ! convention between infrequent radiation
-                         ! calls). 
+    radt = 60.0_RKIND
+    call radconst(declin, solcon, coszr(1,1), julian, col%lat, col%lon, &
+         &        gmt, 0.0_RKIND, radt)
 
     rthratensw = 0.0_RKIND
     rthratenlw = 0.0_RKIND

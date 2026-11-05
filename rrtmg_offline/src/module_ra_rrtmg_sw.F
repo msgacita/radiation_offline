@@ -10100,7 +10100,7 @@ CONTAINS
  integer:: idx_rei
  integer:: i,j,k,n
 
- real:: coszrs,xt24,tloctm,hrang,xxlat,adjes,scon
+ real:: coszrs,adjes,scon
  real:: ro,dz
  real:: corr
  real:: gliqwp,gicewp,gsnowp,gravmks
@@ -10195,16 +10195,10 @@ CONTAINS
 !--- longitude loop:
     i_loop: do i = its,ite
 
-       !--- calculate the cosine of the solar zenith angle at the current time step to determine if the sun is
-       !    above or below the horizon (xt24 is the fractional part of simulation days plus half of radt in 
-       !    units of minutes, julian is in days, and radt is in minutes). do not call rrtmg_sw is night-time:
+       !--- use the solar zenith angle calculated by radconst to determine
+       !    if the sun is above or below the horizon; do not call rrtmg_sw at night:
        dorrsw = .true.
-       xt24 = mod(xtime+radt*0.5,1440.)
-       tloctm = gmt + xt24/60. + xlong(i,j)/15.
-       hrang = 15. * (tloctm-12.) * degrad
-       xxlat = xlat(i,j) * degrad
-       coszrs = sin(xxlat) * sin(declin) + cos(xxlat) * cos(declin) * cos(hrang)
-       coszr(i,j) = coszrs
+       coszrs = coszr(i,j)
 
        if (coszrs.le.0.0) dorrsw = .false.
        
