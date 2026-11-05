@@ -246,18 +246,12 @@ program rrtmg_offline_driver
     call era5_valid_time_to_julian_gmt(era5f, itime, julian, gmt, julday)
     call radconst(declin, solcon, julian)
     degrad_local = 3.1415926_RKIND/180.0_RKIND
-    radt = 0.0_RKIND     ! minutes. IMPORTANT: rrtmg_swrad computes
+    radt = 60.0_RKIND     ! minutes. IMPORTANT: rrtmg_swrad computes
                          ! coszrs using xt24=mod(xtime+radt*0.5,1440),
                          ! i.e. it centers the zenith angle on
                          ! xtime+radt/2 (WRF/MPAS's forward-averaging
                          ! convention between infrequent radiation
-                         ! calls). Since this offline driver already
-                         ! supplies gmt for the EXACT hour of each ERA5
-                         ! timestep and wants an exact instantaneous
-                         ! angle (not a forward average), radt must be
-                         ! 0.0 here -- a nonzero value (as in an
-                         ! earlier revision of this file) silently
-                         ! shifts every coszrs by radt/2 minutes.
+                         ! calls). 
 
     rthratensw = 0.0_RKIND
     rthratenlw = 0.0_RKIND

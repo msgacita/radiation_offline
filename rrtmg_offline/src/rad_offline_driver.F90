@@ -64,7 +64,9 @@ program rad_offline_driver
   integer :: julday
   real(kind=RKIND), allocatable :: rthratensw(:), rthratenlw(:)
   real(kind=RKIND), allocatable :: flux_sw_up(:), flux_sw_dn(:)
+  real(kind=RKIND), allocatable :: flux_sw_up_clear(:), flux_sw_dn_clear(:)
   real(kind=RKIND), allocatable :: flux_lw_up(:), flux_lw_dn(:)
+  real(kind=RKIND), allocatable :: flux_lw_up_clear(:), flux_lw_dn_clear(:)
 
   ! ---- WRF/MPAS-style "1x1 tile" arrays for the RRTMG branch (same
   !      as rrtmg_offline_driver.F90 -- see that file for a more
@@ -80,6 +82,8 @@ program rad_offline_driver
   real(kind=RKIND), allocatable :: qi3d(:,:,:), qs3d(:,:,:), qg3d(:,:,:)
   real(kind=RKIND), allocatable :: cldfra3d(:,:,:), o33d(:,:,:)
   real(kind=RKIND), allocatable :: re_cloud(:,:,:), re_ice(:,:,:), re_snow(:,:,:)
+  real(kind=RKIND), allocatable :: rre_cloud3d(:,:,:), rre_ice3d(:,:,:), rre_snow3d(:,:,:)
+  real(kind=RKIND), allocatable :: reff_cloud(:), reff_ice(:)
   real(kind=RKIND), allocatable :: rthratensw3(:,:,:), rthratenlw3(:,:,:)
   real(kind=RKIND), allocatable :: swupflx(:,:,:), swupflxc(:,:,:)
   real(kind=RKIND), allocatable :: swdnflx(:,:,:), swdnflxc(:,:,:)
@@ -150,13 +154,16 @@ program rad_offline_driver
           if (col%nlev_valid >= 4) then
             allocate(rthratensw(col%nlev_valid), rthratenlw(col%nlev_valid))
             allocate(flux_sw_up(col%nlev_valid+1), flux_sw_dn(col%nlev_valid+1))
+            allocate(flux_sw_up_clear(col%nlev_valid+1), flux_sw_dn_clear(col%nlev_valid+1))
             allocate(flux_lw_up(col%nlev_valid+1), flux_lw_dn(col%nlev_valid+1))
+            allocate(flux_lw_up_clear(col%nlev_valid+1), flux_lw_dn_clear(col%nlev_valid+1))
             call era5_valid_time_to_julian_gmt(era5f, itime_probe, julian, gmt, julday)
             call radconst(declin, solcon, julian)
             call era5_ecrad_run_column(ecrad_config, col, declin, solcon, gmt, &
                  &  3.1415926_RKIND/180.0_RKIND, rthratensw, rthratenlw, &
-                 &  flux_sw_up, flux_sw_dn, flux_lw_up, flux_lw_dn)
-            deallocate(rthratensw, rthratenlw, flux_sw_up, flux_sw_dn, flux_lw_up, flux_lw_dn)
+                 &  flux_sw_up, flux_sw_dn, flux_lw_up, flux_lw_dn, &
+                 &  flux_sw_up_clear, flux_sw_dn_clear, flux_lw_up_clear, flux_lw_dn_clear)
+            deallocate(rthratensw, rthratenlw, flux_sw_up, flux_sw_dn, flux_sw_up_clear, flux_sw_dn_clear, flux_lw_up, flux_lw_dn, flux_lw_up_clear, flux_lw_dn_clear)
             warmed_up = .true.
           end if
           deallocate(col%p,col%t,col%z,col%qv,col%qc,col%qi,col%qr,col%qs,col%cldfra,col%o3)
@@ -237,8 +244,12 @@ program rad_offline_driver
 	rthratensw=0.0;rthratenlw=0.0
         allocate(flux_sw_up(nlev+1), flux_sw_dn(nlev+1))
 	flux_sw_up=0.0;flux_sw_dn=0.0
+        allocate(flux_sw_up_clear(nlev+1), flux_sw_dn_clear(nlev+1))
+	flux_sw_up_clear=0.0;flux_sw_dn_clear=0.0
         allocate(flux_lw_up(nlev+1), flux_lw_dn(nlev+1))
 	flux_lw_up=0.0;flux_lw_dn=0.0
+        allocate(flux_lw_up_clear(nlev+1), flux_lw_dn_clear(nlev+1))
+	flux_lw_up_clear=0.0;flux_lw_dn_clear=0.0
 
     select case (trim(ctl%radiation_scheme))
     ! ---------------------------------------------------------------
@@ -246,7 +257,7 @@ program rad_offline_driver
     ! ---------------------------------------------------------------
       call era5_ecrad_run_column(ecrad_config, col, declin, solcon, gmt, &
            &  degrad_local, rthratensw, rthratenlw, &
-           &  flux_sw_up, flux_sw_dn, flux_lw_up, flux_lw_dn)
+           &  flux_sw_up, flux_sw_dn, flux_lw_up, flux_lw_dn, flux_sw_up_clear, flux_sw_dn_clear, flux_lw_up_clear, flux_lw_dn_clear)
 
       do k = 1, nlev
         if(ABS(rthratensw(k)) > 50.0) print*,'sw ',k,rthratensw(k), &
@@ -294,6 +305,11 @@ program rad_offline_driver
       allocate(cldfra3d(ims:ime,kms:kme,jms:jme), o33d(ims:ime,kms:kme,jms:jme))
       allocate(re_cloud(ims:ime,kms:kme,jms:jme), re_ice(ims:ime,kms:kme,jms:jme))
       allocate(re_snow(ims:ime,kms:kme,jms:jme))
+      allocate(rre_cloud3d(ims:ime,kms:kme,jms:jme), rre_ice3d(ims:ime,kms:kme,jms:jme))
+      allocate(rre_snow3d(ims:ime,kms:kme,jms:jme))
+      rre_cloud3d = 0.0_RKIND
+      rre_ice3d = 0.0_RKIND
+      rre_snow3d = 0.0_RKIND
       allocate(dz8w(ims:ime,kms:kme,jms:jme))
       allocate(p8w(ims:ime,kms:kme,jms:jme), t8w(ims:ime,kms:kme,jms:jme))
       allocate(rthratensw3(ims:ime,kms:kme,jms:jme), rthratenlw3(ims:ime,kms:kme,jms:jme))
@@ -383,7 +399,7 @@ program rad_offline_driver
            &  qv3d=qv3d,qc3d=qc3d,qr3d=qr3d,qi3d=qi3d,qs3d=qs3d,qg3d=qg3d,          &
            &  cldfra3d=cldfra3d,o33d=o33d,tsk=tsk,albedo=albedo,                   &
            &  xland=xland,xice=xice,snow=snow,coszr=coszr,xtime=0.0_RKIND,gmt=gmt, &
-           &  julday=julday,radt=0.0_RKIND,degrad=degrad_local,declin=declin,      &
+           &  julday=julday,radt=60.0_RKIND,degrad=degrad_local,declin=declin,      &
            &  solcon=solcon,xlat=xlat,xlong=xlong,icloud=1,                        &
            &  cldovrlp=2,idcor=1,o3input=0,                                        &
            &  noznlevels=1,gsw=gsw,swcf=swcf,rthratensw=rthratensw3,               &
@@ -403,6 +419,7 @@ program rad_offline_driver
            &  glw=glw,olr=olr,lwcf=lwcf,rthratenlw=rthratenlw3,                    &
            &  has_reqc=0,has_reqi=0,has_reqs=0,re_cloud=re_cloud,                  &
            &  re_ice=re_ice,re_snow=re_snow,                                       &
+           &  rre_cloud=rre_cloud3d,rre_ice=rre_ice3d,rre_snow=rre_snow3d,         &
            &  lwupflx=lwupflx,lwupflxc=lwupflxc,lwdnflx=lwdnflx,lwdnflxc=lwdnflxc,  &
            &  ids=ids,ide=ide,jds=jds,jde=jde,kds=kds,kde=kde,                     &
            &  ims=ims,ime=ime,jms=jms,jme=jme,kms=kms,kme=kme,                     &
@@ -427,11 +444,21 @@ program rad_offline_driver
         flux_sw_dn(k) = swdnflx(1,nlev+2-k,1)
         flux_lw_up(k) = lwupflx(1,nlev+2-k,1)
         flux_lw_dn(k) = lwdnflx(1,nlev+2-k,1)
+        flux_sw_up_clear(k) = swupflxc(1,nlev+2-k,1)
+        flux_sw_dn_clear(k) = swdnflxc(1,nlev+2-k,1)
+        flux_lw_up_clear(k) = lwupflxc(1,nlev+2-k,1)
+        flux_lw_dn_clear(k) = lwdnflxc(1,nlev+2-k,1)
+      end do
+      allocate(reff_cloud(nlev), reff_ice(nlev))
+      do k = 1, nlev
+        reff_cloud(k) = rre_cloud3d(1,nlev-k+1,1)
+        reff_ice(k) = rre_ice3d(1,nlev-k+1,1)
       end do
 
       deallocate(p3d,pi3d,t3d,qv3d,qc3d,qr3d,qi3d,qs3d,qg3d,cldfra3d,o33d)
       deallocate(re_cloud,re_ice,re_snow,dz8w,p8w,t8w,rthratensw3,rthratenlw3)
       deallocate(swupflx,swupflxc,swdnflx,swdnflxc,lwupflx,lwupflxc,lwdnflx,lwdnflxc)
+      deallocate(rre_cloud3d,rre_ice3d,rre_snow3d)
 
     end select
 
@@ -439,14 +466,27 @@ program rad_offline_driver
         ! Write output (same NetCDF file/variables regardless of scheme)
         ! -------------------------------------------------------------
         
-        call output_write_timestep(outf, ilon_idx, ilat_idx, it_index, nlev, &
-             &  era5f%valid_time(itime), &
-             &  col%t(1:nlev), col%qv(1:nlev), col%z(1:nlev), &
-             &  col%qc(1:nlev), col%qi(1:nlev), col%qr(1:nlev), col%qs(1:nlev), &
-             &  col%cldfra(1:nlev), col%o3(1:nlev), col%sp, col%skt, &
-             &  rthratensw, rthratenlw, flux_sw_up, flux_sw_dn, flux_lw_up, flux_lw_dn)
+        if (trim(ctl%radiation_scheme) == 'rrtmg') then
+          call output_write_timestep(outf, ilon_idx, ilat_idx, it_index, nlev, &
+               &  era5f%valid_time(itime), &
+               &  col%t(1:nlev), col%qv(1:nlev), col%z(1:nlev), &
+               &  col%qc(1:nlev), col%qi(1:nlev), col%qr(1:nlev), col%qs(1:nlev), &
+               &  col%cldfra(1:nlev), col%o3(1:nlev), col%sp, col%skt, &
+               &  rthratensw, rthratenlw, flux_sw_up, flux_sw_dn, flux_lw_up, flux_lw_dn, &
+               &  flux_sw_up_clear, flux_sw_dn_clear, flux_lw_up_clear, flux_lw_dn_clear, &
+               &  reliq=reff_cloud, reice=reff_ice)
+        else
+          call output_write_timestep(outf, ilon_idx, ilat_idx, it_index, nlev, &
+               &  era5f%valid_time(itime), &
+               &  col%t(1:nlev), col%qv(1:nlev), col%z(1:nlev), &
+               &  col%qc(1:nlev), col%qi(1:nlev), col%qr(1:nlev), col%qs(1:nlev), &
+               &  col%cldfra(1:nlev), col%o3(1:nlev), col%sp, col%skt, &
+               &  rthratensw, rthratenlw, flux_sw_up, flux_sw_dn, flux_lw_up, flux_lw_dn, &
+               &  flux_sw_up_clear, flux_sw_dn_clear, flux_lw_up_clear, flux_lw_dn_clear)
+        end if
 
-        deallocate(rthratensw, rthratenlw, flux_sw_up, flux_sw_dn, flux_lw_up, flux_lw_dn)
+        deallocate(rthratensw, rthratenlw, flux_sw_up, flux_sw_dn, flux_sw_up_clear, flux_sw_dn_clear, flux_lw_up, flux_lw_dn, flux_lw_up_clear, flux_lw_dn_clear)
+        if (allocated(reff_cloud)) deallocate(reff_cloud, reff_ice)
         deallocate(col%p,col%t,col%z,col%qv,col%qc,col%qi,col%qr,col%qs,col%cldfra,col%o3)
 
       end do

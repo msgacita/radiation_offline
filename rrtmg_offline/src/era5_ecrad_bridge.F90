@@ -80,6 +80,7 @@ contains
     character(len=*),   intent(in)   :: namelist_path
 
     call config%read(file_name=trim(namelist_path))
+    config%do_clear = .true.
     call setup_radiation(config)
     is_initialized = .true.
 
@@ -98,7 +99,7 @@ contains
   !=================================================================
   subroutine era5_ecrad_run_column(config, col, declin, solcon, gmt, &
        &  degrad, rthratensw, rthratenlw, flux_sw_up, flux_sw_dn, &
-       &  flux_lw_up, flux_lw_dn)
+       &  flux_lw_up, flux_lw_dn, flux_sw_up_clear, flux_sw_dn_clear, flux_lw_up_clear, flux_lw_dn_clear)
 
     type(config_type),       intent(in)  :: config
     type(era5_column_type),  intent(in)  :: col
@@ -118,6 +119,11 @@ contains
     real(kind=RKIND), intent(out) :: flux_sw_dn(col%nlev_valid+1)
     real(kind=RKIND), intent(out) :: flux_lw_up(col%nlev_valid+1)
     real(kind=RKIND), intent(out) :: flux_lw_dn(col%nlev_valid+1)
+    real(kind=RKIND), intent(out) :: flux_sw_up_clear(col%nlev_valid+1)
+    real(kind=RKIND), intent(out) :: flux_sw_dn_clear(col%nlev_valid+1)
+    real(kind=RKIND), intent(out) :: flux_lw_up_clear(col%nlev_valid+1)
+    real(kind=RKIND), intent(out) :: flux_lw_dn_clear(col%nlev_valid+1)
+
 
     type(single_level_type)   :: single_level
     type(thermodynamics_type) :: thermodynamics
@@ -315,13 +321,17 @@ contains
 
     ! Interface flux profiles, same top-to-bottom order as everything
     ! else here -- index 1 (TOA) and index nlev+1 (surface) give the
-    ! boundary ("topo"/"superfície") values directly; every other
+    ! boundary ("topo"/"superfï¿½cie") values directly; every other
     ! index is the flux at that internal layer boundary ("camadas").
     do k = 1, nlev+1
       flux_sw_up(k) = real(flux%sw_up(1,k), RKIND)
       flux_sw_dn(k) = real(flux%sw_dn(1,k), RKIND)
       flux_lw_up(k) = real(flux%lw_up(1,k), RKIND)
       flux_lw_dn(k) = real(flux%lw_dn(1,k), RKIND)
+      flux_sw_up_clear(k) = real(flux%sw_up_clear(1,k), RKIND)
+      flux_sw_dn_clear(k) = real(flux%sw_dn_clear(1,k), RKIND)
+      flux_lw_up_clear(k) = real(flux%lw_up_clear(1,k), RKIND)
+      flux_lw_dn_clear(k) = real(flux%lw_dn_clear(1,k), RKIND)
     end do
 
     call single_level%deallocate()

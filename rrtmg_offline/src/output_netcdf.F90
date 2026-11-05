@@ -36,6 +36,9 @@
 !   directly usable), clwc, ciwc, crwc, cswc, cc, o3. Plus two scalar
 !   fields from the single-level input file: sp, skt.
 !
+!   RRTMG cloud diagnostics: reliq and reice (full levels, um; written
+!   only where cloud fraction is positive).
+!
 !   Radiative output: rthratensw, rthratenlw (full levels, K/s) and
 !   sw_up/sw_dn/lw_up/lw_dn (half levels, W/m2 -- index 1 is the
 !   TOA-most interface, index n_valid+1 the surface for THAT column,
@@ -65,8 +68,8 @@ module output_netcdf
     ! variable ids
     integer :: id_t, id_q, id_z, id_clwc, id_ciwc, id_crwc, id_cswc, &
          &     id_cc, id_o3, id_sp, id_skt
-    integer :: id_rthratensw, id_rthratenlw
-    integer :: id_sw_up, id_sw_dn, id_lw_up, id_lw_dn
+    integer :: id_rthratensw, id_rthratenlw, id_reliq, id_reice
+    integer :: id_sw_up, id_sw_dn, id_lw_up, id_lw_dn, id_sw_up_clear, id_sw_dn_clear, id_lw_up_clear, id_lw_dn_clear
     integer :: id_valid_time
   end type output_file_type
 
@@ -148,7 +151,10 @@ contains
          &  'shortwave radiative heating rate (theta/T tendency, uncoupled)', f%id_rthratensw)
     call def_profile_var(f%ncid, 'rthratenlw', dims4, 'K s-1', &
          &  'longwave radiative heating rate (theta/T tendency, uncoupled)', f%id_rthratenlw)
-
+    call def_profile_var(f%ncid, 'reliq', dims4, 'um', &
+         &  'RRTMG cloud liquid effective radius', f%id_reliq)
+    call def_profile_var(f%ncid, 'reice', dims4, 'um', &
+         &  'RRTMG cloud ice effective radius', f%id_reice)
     dims3 = (/ dimid_lon, dimid_lat, dimid_time /)
     call def_scalar_var(f%ncid, 'sp',  dims3, 'Pa', 'surface_pressure', f%id_sp)
     call def_scalar_var(f%ncid, 'skt', dims3, 'K',  'skin_temperature', f%id_skt)
@@ -158,10 +164,18 @@ contains
          &  'upwelling shortwave flux at layer interfaces (index 1=TOA, last valid=surface)', f%id_sw_up)
     call def_profile_var(f%ncid, 'sw_dn', dims4, 'W m-2', &
          &  'downwelling shortwave flux at layer interfaces (index 1=TOA, last valid=surface)', f%id_sw_dn)
+    call def_profile_var(f%ncid, 'sw_up_clear', dims4, 'W m-2', &
+         &  'upwelling shortwave flux at layer interfaces (index 1=TOA, last valid=surface)', f%id_sw_up_clear)
+    call def_profile_var(f%ncid, 'sw_dn_clear', dims4, 'W m-2', &
+         &  'downwelling shortwave flux at layer interfaces (index 1=TOA, last valid=surface)', f%id_sw_dn_clear)
     call def_profile_var(f%ncid, 'lw_up', dims4, 'W m-2', &
          &  'upwelling longwave flux at layer interfaces (index 1=TOA, last valid=surface)', f%id_lw_up)
     call def_profile_var(f%ncid, 'lw_dn', dims4, 'W m-2', &
          &  'downwelling longwave flux at layer interfaces (index 1=TOA, last valid=surface)', f%id_lw_dn)
+    call def_profile_var(f%ncid, 'lw_up_clear', dims4, 'W m-2', &
+         &  'upwelling longwave flux at layer interfaces (index 1=TOA, last valid=surface)', f%id_lw_up_clear)
+    call def_profile_var(f%ncid, 'lw_dn_clear', dims4, 'W m-2', &
+         &  'downwelling longwave flux at layer interfaces (index 1=TOA, last valid=surface)', f%id_lw_dn_clear)
 
     call nc_check(nf90_put_att(f%ncid, NF90_GLOBAL, 'radiation_scheme', trim(radiation_scheme)), 'att scheme')
     call nc_check(nf90_put_att(f%ncid, NF90_GLOBAL, 'source', &
@@ -230,7 +244,7 @@ contains
   subroutine output_write_timestep(f, ilon_idx, ilat_idx, it_index, &
        &  n_valid, valid_time_value, t, q, z, clwc, &
        &  ciwc, crwc, cswc, cc, o3, sp, skt, rthratensw, rthratenlw, &
-       &  sw_up, sw_dn, lw_up, lw_dn)
+       &  sw_up, sw_dn, lw_up, lw_dn, sw_up_clear, sw_dn_clear, lw_up_clear, lw_dn_clear, reliq, reice)
 
     type(output_file_type), intent(inout) :: f
     integer, intent(in) :: ilon_idx, ilat_idx, it_index, n_valid
@@ -243,8 +257,13 @@ contains
     real(kind=RKIND), intent(in) :: rthratensw(n_valid), rthratenlw(n_valid)
     real(kind=RKIND), intent(in) :: sw_up(n_valid+1), sw_dn(n_valid+1)
     real(kind=RKIND), intent(in) :: lw_up(n_valid+1), lw_dn(n_valid+1)
+    real(kind=RKIND), intent(in) :: sw_up_clear(n_valid+1), sw_dn_clear(n_valid+1)
+    real(kind=RKIND), intent(in) :: lw_up_clear(n_valid+1), lw_dn_clear(n_valid+1)
+    real(kind=RKIND), intent(in), optional :: reliq(n_valid), reice(n_valid)
 
     integer :: start4(4), count4(4), start3(3), count3(3), start1(1)
+    integer :: k
+    real(kind=RKIND), allocatable :: radii_out(:)
 
     ! Harmless to (re)write the same valid_time value once per grid
     ! column at the same it_index -- same value every time, and this
@@ -267,6 +286,25 @@ contains
     call nc_check(nf90_put_var(f%ncid, f%id_rthratensw, reshape(rthratensw,(/1,1,n_valid,1/)), start4, count4), 'put rthratensw')
     call nc_check(nf90_put_var(f%ncid, f%id_rthratenlw, reshape(rthratenlw,(/1,1,n_valid,1/)), start4, count4), 'put rthratenlw')
 
+    if (present(reliq) .neqv. present(reice)) then
+      error stop 'Both reliq and reice must be provided together'
+    end if
+    if (present(reliq)) then
+      allocate(radii_out(n_valid))
+      radii_out = real(NF90_FILL_DOUBLE, kind=RKIND)
+      do k = 1, n_valid
+        if (cc(k) > 0.0_RKIND) radii_out(k) = reliq(k)
+      end do
+      call nc_check(nf90_put_var(f%ncid, f%id_reliq, reshape(radii_out,(/1,1,n_valid,1/)), &
+           &  start4, count4), 'put reliq')
+      do k = 1, n_valid
+        if (cc(k) > 0.0_RKIND) radii_out(k) = reice(k)
+      end do
+      call nc_check(nf90_put_var(f%ncid, f%id_reice, reshape(radii_out,(/1,1,n_valid,1/)), &
+           &  start4, count4), 'put reice')
+      deallocate(radii_out)
+    endif
+
     start3 = (/ ilon_idx, ilat_idx, it_index /)
     count3 = (/ 1, 1, 1 /)
     call nc_check(nf90_put_var(f%ncid, f%id_sp,  (/sp/),  start3, count3), 'put sp')
@@ -278,6 +316,11 @@ contains
     call nc_check(nf90_put_var(f%ncid, f%id_sw_dn, reshape(sw_dn,(/1,1,n_valid+1,1/)), start4, count4), 'put sw_dn')
     call nc_check(nf90_put_var(f%ncid, f%id_lw_up, reshape(lw_up,(/1,1,n_valid+1,1/)), start4, count4), 'put lw_up')
     call nc_check(nf90_put_var(f%ncid, f%id_lw_dn, reshape(lw_dn,(/1,1,n_valid+1,1/)), start4, count4), 'put lw_dn')
+    call nc_check(nf90_put_var(f%ncid, f%id_sw_up_clear, reshape(sw_up_clear,(/1,1,n_valid+1,1/)), start4, count4), 'put sw_up_clear')
+    call nc_check(nf90_put_var(f%ncid, f%id_sw_dn_clear, reshape(sw_dn_clear,(/1,1,n_valid+1,1/)), start4, count4), 'put sw_dn_clear')
+    call nc_check(nf90_put_var(f%ncid, f%id_lw_up_clear, reshape(lw_up_clear,(/1,1,n_valid+1,1/)), start4, count4), 'put lw_up_clear')
+    call nc_check(nf90_put_var(f%ncid, f%id_lw_dn_clear, reshape(lw_dn_clear,(/1,1,n_valid+1,1/)), start4, count4), 'put lw_dn_clear')
+    
 
   end subroutine output_write_timestep
 
